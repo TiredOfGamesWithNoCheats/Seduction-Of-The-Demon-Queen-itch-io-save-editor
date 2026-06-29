@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# Save files (don't commit personal saves)
+*.sav
+
+# Game assets (not part of the editor)
+assets/
