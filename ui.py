@@ -155,7 +155,7 @@ class GeneralPage(_Page):
             font=ctk.CTkFont(size=SZ_BODY),
         ).pack(side="left")
         self._time_menu = ctk.CTkOptionMenu(
-            tod_row, values=["Morning", "Afternoon", "Night"],
+            tod_row, values=["Day", "Evening", "Night"],
             font=ctk.CTkFont(size=SZ_BODY),
         )
         self._time_menu.pack(side="left", fill="x", expand=True)
@@ -163,7 +163,47 @@ class GeneralPage(_Page):
         _section(scroll, "Flags")
         self._completed = _flag_row(scroll, "Game Completed")
         self._new_game  = _flag_row(scroll, "Is New Game")
-        self._door      = _flag_row(scroll, "Door Locked")
+
+        # Door Locked — story-critical, gets its own warned row
+        door_row = ctk.CTkFrame(scroll, fg_color="transparent")
+        door_row.pack(fill="x", pady=ROW_PY)
+        self._door = ctk.BooleanVar()
+        ctk.CTkCheckBox(
+            door_row, text="Door Locked", variable=self._door,
+            font=ctk.CTkFont(size=SZ_BODY),
+            command=self._on_door_lock_toggled,
+        ).pack(side="left")
+        ctk.CTkLabel(
+            door_row, text="⚠  Story-critical — read warning before changing",
+            text_color="#E67E22", font=ctk.CTkFont(size=SZ_HINT),
+        ).pack(side="left", padx=12)
+
+    def _on_door_lock_toggled(self):
+        if self._door.get():
+            messagebox.showwarning(
+                "Door Lock — Story Warning",
+                "Enabling Door Locked is a story-critical state.\n\n"
+                "When active, the game:\n"
+                "  • Disables and fades out all map areas\n"
+                "  • Replaces all dialog options with only three\n"
+                "    locked timeline buttons: BingeParty, Footjob,\n"
+                "    and Penance\n\n"
+                "This state is only valid after SuddenEscape has\n"
+                "been completed. Without it, you will be fully\n"
+                "locked out of all gameplay with no way to progress.\n\n"
+                "The lock is released automatically when Penance\n"
+                "is completed.",
+            )
+        else:
+            messagebox.showinfo(
+                "Door Lock — Story Warning",
+                "Disabling Door Locked manually may skip story content.\n\n"
+                "The door is normally unlocked by the game after\n"
+                "completing the Penance timeline. If you have not\n"
+                "completed Penance, disabling this may cause the\n"
+                "story to skip the BingeParty → Footjob → Penance\n"
+                "sequence.",
+            )
 
     def refresh(self):
         if not self.model.loaded:
@@ -660,7 +700,7 @@ class StatsPage(_Page):
         _section(scroll, "Session")
         self._version  = _form_row(scroll, "Game Version")
         self._launch   = _form_row(scroll, "Launch Count")
-        self._playtime = _form_row(scroll, "Playtime (raw)")
+        self._playtime = _form_row(scroll, "Playtime (d/h/m/s)")
 
         # Make version and playtime read-only after build
         # (we can't easily make _form_row return the entry widget,
@@ -683,7 +723,11 @@ class StatsPage(_Page):
         s = self.model.stats
         self._version.set(s.game_version)
         self._launch.set(str(s.launch_count))
-        self._playtime.set(str(s.playtime_array))
+        pt = s.playtime_array
+        if isinstance(pt, list) and len(pt) == 4:
+            self._playtime.set(f"{pt[0]}d  {pt[1]}h  {pt[2]}m  {pt[3]}s")
+        else:
+            self._playtime.set(str(pt))
         self._easy.set(str(s.easy_mode_completions))
         self._normal.set(str(s.normal_mode_completions))
         self._hard.set(str(s.hard_mode_completions))
@@ -756,6 +800,74 @@ class AdvancedPage(_Page):
                 self.model.set(key, GodotConfig.parse_value(var.get()))
             except Exception:
                 pass
+
+
+# ──────────────────────────────────────────────
+# Finish Storyline dialog
+# ──────────────────────────────────────────────
+
+class _StoryFinishDialog(ctk.CTkToplevel):
+    """Modal popup: pick which story arc to complete."""
+
+    def __init__(self, parent, on_choose):
+        super().__init__(parent)
+        self.title("Finish Storyline")
+        self.geometry("380x420")
+        self.resizable(False, False)
+        self.transient(parent)
+        self.grab_set()
+
+        ctk.CTkLabel(
+            self, text="Complete which story arc?",
+            font=ctk.CTkFont(size=SZ_TITLE, weight="bold"),
+        ).pack(pady=(20, 6))
+
+        ctk.CTkLabel(
+            self,
+            text=(
+                "Unlocks every timeline in the arc (with full\n"
+                "prerequisite chains), raises enslavement/coins/day\n"
+                "to meet every requirement, unlocks the poses those\n"
+                "timelines grant, and rebuilds rooms."
+            ),
+            text_color="gray60", font=ctk.CTkFont(size=SZ_HINT),
+            justify="center",
+        ).pack(pady=(0, 18))
+
+        for label, story in [
+            ("Demoness Story",   "Demoness"),
+            ("Vergil Story",     "Vergil"),
+            ("Esther Story",     "Esther"),
+            ("Documents & Misc", "Documents"),
+        ]:
+            ctk.CTkButton(
+                self, text=label, height=34,
+                command=lambda s=story: self._pick(s, on_choose),
+            ).pack(fill="x", padx=28, pady=4)
+
+        ctk.CTkFrame(self, height=1, fg_color="gray30").pack(fill="x", padx=28, pady=10)
+
+        ctk.CTkButton(
+            self, text="Everything (Trigger Ending)", height=36,
+            fg_color="#5B2C6F", hover_color="#7D3C98",
+            command=lambda: self._pick("All", on_choose),
+        ).pack(fill="x", padx=28, pady=4)
+        ctk.CTkLabel(
+            self,
+            text="Unlocks every timeline the game checks for the\nending screen, across all four arcs above.",
+            text_color="gray60", font=ctk.CTkFont(size=SZ_HINT),
+            justify="center",
+        ).pack(pady=(0, 4))
+
+        ctk.CTkButton(
+            self, text="Cancel", height=34,
+            fg_color="gray30", hover_color="gray40",
+            command=self.destroy,
+        ).pack(fill="x", padx=28, pady=(8, 16))
+
+    def _pick(self, story: str, on_choose):
+        self.destroy()
+        on_choose(story)
 
 
 # ──────────────────────────────────────────────
@@ -849,9 +961,10 @@ class SaveEditorGUI(ctk.CTk):
         ).pack(pady=(0, 4))
 
         for text, cmd, fg, hv in [
-            ("Unlock Everything", self._cheat_unlock_all, "#5B2C6F", "#7D3C98"),
-            ("Max Coins",         self._cheat_max_coins,  "#1A5276", "#2874A6"),
-            ("Validate Save",     self._validate,         "gray30",  "gray40"),
+            ("Unlock Everything", self._cheat_unlock_all,    "#5B2C6F", "#7D3C98"),
+            ("Finish Storyline",  self._cheat_finish_story,  "#1E6B4F", "#27896A"),
+            ("Max Coins",         self._cheat_max_coins,     "#1A5276", "#2874A6"),
+            ("Validate Save",     self._validate,            "gray30",  "gray40"),
         ]:
             ctk.CTkButton(
                 sb, text=text, command=cmd,
@@ -916,10 +1029,17 @@ class SaveEditorGUI(ctk.CTk):
         if not self.model.loaded:
             messagebox.showwarning("No Save", "Open a save file first.")
             return
-        for page in self._pages.values():
-            page.collect()
+        # Advanced must collect first — its vars may be stale for fields
+        # that other pages also manage. Specific pages collect after and
+        # override correctly.
+        self._pages["advanced"].collect()
+        for pid, page in self._pages.items():
+            if pid != "advanced":
+                page.collect()
         try:
             self.model.save_file()
+            # Re-sync Advanced so it reflects the final saved state.
+            self._pages["advanced"].refresh()
             messagebox.showinfo("Saved", "Save written successfully.")
         except Exception as exc:
             messagebox.showerror("Error", f"Failed to save:\n{exc}")
@@ -966,6 +1086,81 @@ class SaveEditorGUI(ctk.CTk):
         self.model.items.unlock_all_items()
         self._refresh_all()
         self._offer_bypass(amount)
+
+    def _cheat_finish_story(self):
+        if not self.model.loaded:
+            messagebox.showwarning("No Save", "Open a save file first.")
+            return
+        _StoryFinishDialog(self, self._do_finish_story)
+
+    def _do_finish_story(self, story_name: str):
+        stories = (
+            ["Demoness", "Vergil", "Esther", "Documents"]
+            if story_name == "All" else [story_name]
+        )
+
+        max_enslavement      = 0.0
+        max_coins            = 0.0
+        max_days             = 0
+        max_barony_documents = 0
+        max_guild_documents  = 0
+
+        for story in stories:
+            reqs = self.model.timelines.finish_story(story)
+            max_enslavement      = max(max_enslavement,      reqs.get("enslavement", 0.0))
+            max_coins            = max(max_coins,            reqs.get("coins", 0.0))
+            max_days             = max(max_days,             int(reqs.get("days", 0)))
+            max_barony_documents = max(max_barony_documents, int(reqs.get("barony_documents", 0)))
+            max_guild_documents  = max(max_guild_documents,  int(reqs.get("guild_documents", 0)))
+
+        s = self.model.stats
+
+        if max_enslavement > s.enslavement:
+            s.enslavement = max_enslavement
+        if max_days > s.current_day:
+            s.current_day = max_days
+
+        coin_target = int(max_coins)
+        if coin_target > s.total_coins:
+            s.max_coins(coin_target)
+
+        # Pad document minigame "approved" lists so their .size() satisfies
+        # SuddenMeeting / TavernGossip / CorruptEmployee / etc. — cosmetic
+        # correctness only, since called_timelines is what actually unlocks them.
+        self._pad_document_list("document_mini_game_1_approved_letters", max_barony_documents)
+        self._pad_document_list("document_mini_game_2_approved_letters", max_guild_documents)
+
+        # Add enslavement_max_extra bonuses only for timelines actually unlocked
+        s.sync_enslavement_max_extra(self.model.timelines.all())
+
+        # Unlock poses granted by the timelines just completed
+        unlocked = set(self.model.timelines.all())
+        for pose in POSES.values():
+            if pose.unlocked_by and pose.unlocked_by in unlocked:
+                try:
+                    self.model.poses.unlock(pose.id)
+                except ValueError:
+                    pass
+
+        self.model.rooms.rebuild()
+        self._refresh_all()
+
+        if coin_target > 0:
+            self._offer_bypass(coin_target)
+
+        labels = {"All": "Everything", "Documents": "Documents & Misc"}
+        label = labels.get(story_name, f"{story_name} story")
+        messagebox.showinfo("Done", f"{label} completed.")
+
+    def _pad_document_list(self, key: str, min_length: int):
+        if min_length <= 0:
+            return
+        values = list(self.model.get(key, []))
+        if not isinstance(values, list):
+            values = []
+        while len(values) < min_length:
+            values.append(f"placeholder_{len(values)}")
+        self.model.set(key, values)
 
     def _offer_bypass(self, amount: int):
         """

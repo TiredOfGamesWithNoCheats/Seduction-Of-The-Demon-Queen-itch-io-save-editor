@@ -162,42 +162,72 @@ class TimelineManager:
     # ==========================================================
 
     def unlock_chain(self, timeline: str):
-
         """
         Unlock timeline and every prerequisite recursively.
-
-        Example
-
-        MarcusAndEsther
-
-            ↓
-
-        ArtOfVergil5
-
-            ↓
-
-        NewAdministrator
-
-            ↓
-
-        ...
+        Ghost timelines (in prerequisites but not in our data) are
+        added directly to called_timelines without a data check,
+        so the chain never breaks on unknown entries.
         """
-
-        visited = set()
+        visited: set[str] = set()
+        order:   list[str] = []
 
         def dfs(name: str):
-
             if name in visited:
                 return
-
             visited.add(name)
-
             for prereq in get_prerequisites(name):
                 dfs(prereq)
-
-            self.unlock(name)
+            order.append(name)
 
         dfs(timeline)
+
+        current = self._list
+        changed = False
+        for name in order:
+            if name not in current:
+                current.append(name)
+                changed = True
+
+        if changed:
+            self._commit(current)
+
+    # ==========================================================
+    # Finish an entire story arc
+    # ==========================================================
+
+    def finish_story(self, story_name: str) -> dict:
+        """
+        Unlock every timeline in a story arc (with full prerequisite
+        chains, including cross-arc dependencies and ghost timelines).
+
+        Returns the max stat requirement per unlock_type found in the
+        arc, e.g. {"enslavement": 55000.0, "coins": 0.0, "days": 27}.
+        The caller is responsible for raising those stats — this
+        manager only touches called_timelines.
+        """
+        from data.timelines import by_story
+
+        timelines = by_story(story_name)
+        if not timelines:
+            return {}
+
+        for tl in timelines:
+            self.unlock_chain(tl.name)
+
+        requirements: dict[str, float] = {
+            "enslavement":       0.0,
+            "coins":             0.0,
+            "days":              0.0,
+            "barony_documents":  0.0,
+            "guild_documents":   0.0,
+        }
+        for tl in timelines:
+            if tl.unlock_type in requirements:
+                requirements[tl.unlock_type] = max(
+                    requirements[tl.unlock_type], tl.unlock_value
+                )
+
+        return requirements
 
     # ==========================================================
     # Recursive dependency search

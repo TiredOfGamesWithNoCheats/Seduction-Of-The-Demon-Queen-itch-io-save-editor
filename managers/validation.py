@@ -59,6 +59,58 @@ class ValidationManager:
 
         return issues
 
+    def _check_door_lock(self) -> list:
+        """
+        door_lock=true is only valid between SuddenEscape (which triggers
+        the lock) and Penance (which releases it). Anything outside that
+        window is a soft-lock or a skipped story segment.
+        """
+        if self.stats is None or self.timelines is None:
+            return []
+
+        locked   = self.stats.door_lock
+        called   = set(self.timelines.all())
+        issues   = []
+
+        # SaveManager._repair_locked_timeline_side_effects() AUTO-ENABLES door_lock
+        # on every load if SuddenEscape/BingeParty/Footjob is present without Penance.
+        trigger_timelines = {"SuddenEscape", "BingeParty", "Footjob"}
+        will_auto_lock = bool(trigger_timelines & called) and "Penance" not in called
+
+        if not locked and will_auto_lock:
+            issues.append({
+                "type":   "door_lock_will_auto_enable",
+                "detail": (
+                    f"Door Locked is off, but the game will automatically "
+                    f"re-enable it on load because "
+                    f"{', '.join(trigger_timelines & called)} "
+                    f"is in your timeline without Penance completing it. "
+                    f"Either enable Door Locked here or unlock up to Penance."
+                ),
+            })
+
+        if locked and "SuddenEscape" not in called:
+            issues.append({
+                "type":   "door_lock_missing_prerequisite",
+                "detail": (
+                    "Door is locked but SuddenEscape has not been completed. "
+                    "All map areas will be disabled with no way to progress. "
+                    "Complete SuddenEscape or disable Door Locked."
+                ),
+            })
+
+        if locked and "Penance" in called:
+            issues.append({
+                "type":   "door_lock_already_resolved",
+                "detail": (
+                    "Door is locked but Penance is already completed. "
+                    "The game should have unlocked the door after Penance. "
+                    "Disable Door Locked to restore normal map access."
+                ),
+            })
+
+        return issues
+
     def run(self) -> dict:
         """
         Run every available validator and return a combined report.
@@ -79,6 +131,10 @@ class ValidationManager:
 
         for issue in self._check_anti_cheat():
             issue["source"] = "anti_cheat"
+            all_issues.append(issue)
+
+        for issue in self._check_door_lock():
+            issue["source"] = "door_lock"
             all_issues.append(issue)
 
         for source, manager in [

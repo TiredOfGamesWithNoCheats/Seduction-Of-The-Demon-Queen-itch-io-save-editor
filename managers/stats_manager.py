@@ -7,7 +7,8 @@ Read/write player statistics from the save.
 from __future__ import annotations
 
 
-TIME_OF_DAY_NAMES = ["Morning", "Afternoon", "Night"]
+# Must match ChangeTimeOfDay.gd StateTime enum: DAY=0, EVENING=1, NIGHT=2
+TIME_OF_DAY_NAMES = ["Day", "Evening", "Night"]
 
 
 class StatsManager:
@@ -85,8 +86,47 @@ class StatsManager:
     def enslavement_max_extra(self, value: list):
         self.model.set("enslavement_max_extra", list(value))
 
+    # UpdateProgression.gd: timeline -> enslavement_max_extra bonus key.
+    # PheromoneBomb is the trigger, "GardenFun" is the bonus name it adds.
+    ENSLAVEMENT_BONUS_MAP = {
+        "SomethingNew":   "SomethingNew",
+        "TestNewItem":    "TestNewItem",
+        "Cowgirl":        "Cowgirl",
+        "DepressedHero":  "DepressedHero",
+        "ChangesInLife":  "ChangesInLife",
+        "FreeBird":       "FreeBird",
+        "PheromoneBomb":  "GardenFun",
+        "JoyfulJailbird": "JoyfulJailbird",
+        "Penance":        "Penance",
+        "Blessing":       "Blessing",
+        "Helen":          "Helen",
+    }
+
+    def sync_enslavement_max_extra(self, called_timelines):
+        """
+        Add enslavement_max_extra bonus entries for every timeline in
+        called_timelines that grants one, mirroring UpdateProgression.gd.
+        Only adds entries for timelines actually unlocked — does not
+        blanket-add every known bonus.
+        """
+        called = set(called_timelines)
+        current = list(self.model.get("enslavement_max_extra", []))
+        changed = False
+        for timeline, bonus_key in self.ENSLAVEMENT_BONUS_MAP.items():
+            if timeline in called and bonus_key not in current:
+                current.append(bonus_key)
+                changed = True
+        if changed:
+            self.model.set("enslavement_max_extra", current)
+
     def max_enslavement(self, cap: float = 100_000.0):
         self.enslavement = cap
+        # Blanket cheat — grant every known bonus regardless of timelines.
+        current = list(self.model.get("enslavement_max_extra", []))
+        for bonus_key in self.ENSLAVEMENT_BONUS_MAP.values():
+            if bonus_key not in current:
+                current.append(bonus_key)
+        self.model.set("enslavement_max_extra", current)
 
     # ==========================================================
     # Time

@@ -100,7 +100,8 @@ class SaveModel:
 
     @property
     def called_timelines(self) -> list:
-        return self.get("called_timelines", [])
+        val = self.get("called_timelines", [])
+        return val if isinstance(val, list) else []
 
     @called_timelines.setter
     def called_timelines(self, value):
@@ -108,7 +109,8 @@ class SaveModel:
 
     @property
     def unlocked_rooms(self) -> list:
-        return self.get("unlocked_rooms", [])
+        val = self.get("unlocked_rooms", [])
+        return val if isinstance(val, list) else []
 
     @unlocked_rooms.setter
     def unlocked_rooms(self, value):
@@ -116,7 +118,8 @@ class SaveModel:
 
     @property
     def available_poses(self) -> list:
-        return self.get("available_isometric_poses", [])
+        val = self.get("available_isometric_poses", [])
+        return val if isinstance(val, list) else []
 
     @available_poses.setter
     def available_poses(self, value):
@@ -124,7 +127,8 @@ class SaveModel:
 
     @property
     def inventory(self) -> dict:
-        return self.get("inventory", {})
+        val = self.get("inventory", {})
+        return val if isinstance(val, dict) else {}
 
     @inventory.setter
     def inventory(self, value):
@@ -132,7 +136,8 @@ class SaveModel:
 
     @property
     def purchased_items(self) -> list:
-        return self.get("purchased_items", [])
+        val = self.get("purchased_items", [])
+        return val if isinstance(val, list) else []
 
     @purchased_items.setter
     def purchased_items(self, value):

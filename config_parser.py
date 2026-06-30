@@ -14,14 +14,24 @@ class GodotConfig:
 
     @classmethod
     def loads(cls, text: str):
+        """
+        Godot's ConfigFile writes non-trivial Array/Dictionary values
+        across multiple lines (e.g. a populated inventory dict). Values
+        are accumulated until braces/brackets balance before parsing.
+        """
 
         cfg = cls()
 
         current = None
 
-        for raw_line in text.splitlines():
+        lines = text.splitlines()
+        i = 0
 
+        while i < len(lines):
+
+            raw_line = lines[i]
             line = raw_line.strip()
+            i += 1
 
             if not line:
                 continue
@@ -39,11 +49,46 @@ class GodotConfig:
             if "=" not in line:
                 continue
 
-            key, value = line.split("=", 1)
+            key, value_text = line.split("=", 1)
+            key = key.strip()
 
-            cfg.sections[current][key] = cls.parse_value(value)
+            while cls._is_unbalanced(value_text) and i < len(lines):
+                value_text += "\n" + lines[i]
+                i += 1
+
+            cfg.sections[current][key] = cls.parse_value(value_text)
 
         return cfg
+
+    @staticmethod
+    def _is_unbalanced(text: str) -> bool:
+        """True if text has more open {[ than close }] outside of quotes."""
+
+        depth = 0
+        in_string = False
+        quote_char = ""
+        escape = False
+
+        for ch in text:
+
+            if in_string:
+                if escape:
+                    escape = False
+                elif ch == "\\":
+                    escape = True
+                elif ch == quote_char:
+                    in_string = False
+                continue
+
+            if ch in ('"', "'"):
+                in_string = True
+                quote_char = ch
+            elif ch in "{[":
+                depth += 1
+            elif ch in "}]":
+                depth -= 1
+
+        return depth > 0
 
     # ----------------------------
     # Values

@@ -1,87 +1,67 @@
 """
-backend/data/poses.py
+data/poses.py
 
-Known isometric poses.
+Isometric pose database.
 
-This file contains ONLY static data.
+IDs must match exactly what SaveManager.add_pose() stores.
+Confirmed from UpdateProgression.gd and SaveManager.gd defaults.
+Dildo Blowjob and Anal Toys IDs are unconfirmed — marked below.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(slots=True)
 class Pose:
-    id: str
-    display_name: str
+    id:            str
+    display_name:  str
+    unlocked_by:   str = ""   # timeline that triggers add_pose()
 
 
+# Insertion order = game's natural unlock order
 POSES = {
 
+    # Default poses (SaveManager.gd save_data defaults)
     "Domination":
-        Pose(
-            id="Domination",
-            display_name="Domination",
-        ),
+        Pose(id="Domination",    display_name="Domination"),
 
     "Jerk-off":
-        Pose(
-            id="Jerk-off",
-            display_name="Jerk Off",
-        ),
+        Pose(id="Jerk-off",      display_name="Jerk Off"),
 
     "Teasing":
-        Pose(
-            id="Teasing",
-            display_name="Teasing",
-        ),
+        Pose(id="Teasing",       display_name="Teasing"),
 
+    # Unlocked by timelines (UpdateProgression.gd — strings are exact)
     "Anilingus":
-        Pose(
-            id="Anilingus",
-            display_name="Anilingus",
-        ),
+        Pose(id="Anilingus",     display_name="Anilingus",
+             unlocked_by="SomethingNew"),
 
-    "Dildo Blowjob":
-        Pose(
-            id="Dildo Blowjob",
-            display_name="Dildo Blowjob",
-        ),
+    "VaginalCowgirl":
+        Pose(id="VaginalCowgirl", display_name="Vaginal Cowgirl",
+             unlocked_by="Cowgirl"),
 
-    "Anal Toys":
-        Pose(
-            id="Anal Toys",
-            display_name="Anal Toys",
-        ),
+    "LegsUp":
+        Pose(id="LegsUp",        display_name="Legs Up",
+             unlocked_by="Footjob"),
 
-    "Vaginal Cowgirl":
-        Pose(
-            id="Vaginal Cowgirl",
-            display_name="Vaginal Cowgirl",
-        ),
-
-    "Legs Up":
-        Pose(
-            id="Legs Up",
-            display_name="Legs Up",
-        ),
-
-    "Sex In The Gazebo":
-        Pose(
-            id="Sex In The Gazebo",
-            display_name="Sex In The Gazebo",
-        ),
+    "SexInTheGazebo":
+        Pose(id="SexInTheGazebo", display_name="Sex In The Gazebo",
+             unlocked_by="FreeBird"),
 
     "Passion":
-        Pose(
-            id="Passion",
-            display_name="Passion",
-        ),
+        Pose(id="Passion",       display_name="Passion",
+             unlocked_by="PheromoneBomb"),
+
+    # Unlocked by item purchases — confirmed from ShopUI.gd _on_dildo_purchased / _on_anal_toy_purchased
+    "DildoBlowjob":
+        Pose(id="DildoBlowjob",  display_name="Dildo Blowjob",
+             unlocked_by="Dildo (item)"),
+
+    "AnalToys":
+        Pose(id="AnalToys",      display_name="Anal Toys",
+             unlocked_by="AnalToy (item)"),
 }
 
-
-# --------------------------------------------------------
-# Helper API
-# --------------------------------------------------------
 
 def get(pose_id: str) -> Pose | None:
     return POSES.get(pose_id)
@@ -95,16 +75,9 @@ def all() -> dict[str, Pose]:
     return POSES
 
 
-def names() -> list[str]:
-    return sorted(POSES.keys())
+def ids() -> list[str]:
+    return list(POSES.keys())
 
 
 def display_names() -> list[str]:
-    return sorted(
-        pose.display_name
-        for pose in POSES.values()
-    )
-
-
-def ids() -> list[str]:
-    return list(POSES.keys())
+    return [p.display_name for p in POSES.values()]

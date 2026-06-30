@@ -230,7 +230,7 @@ _register_story(
         "RobberyOfAristocrats":{"value":5750,"type":"coins"},
         "MinstrelProblem2":{"value":6000,"type":"coins"},
         "TeachingOfSurvival3":{"value":6250,"type":"coins"},
-        "PheromoneBomb":{"value":6550,"type":"coins"},
+        "PheromoneBomb":{"value":6500,"type":"coins"},
     }
 )
 
@@ -250,6 +250,37 @@ _register_story(
         "MarcusAndEsther":{"value":60000,"type":"enslavement"},
     }
 )
+
+# Timelines that are DEPENDENTS (not ancestors) of NewButler/NewAdministrator/
+# IntroductionDoe. unlock_chain() walks UP a prerequisite chain, so these are
+# never reached just by finishing Demoness/Vergil/Esther — they have to be
+# unlocked explicitly. Confirmed against the real Database.gd:
+#   timeline_list_coins:                      Misunderstanding, NewButler
+#   barony_timeline_list_key_approved_document: SuddenMeeting (10 docs)
+#   guild_timeline_list_key_approved_document:  TavernGossip(6), CorruptEmployee(10),
+#                                                ReconnaissanceOfArea(15), Rehearsal(20), Helen(25)
+_register_story(
+    "Documents",
+    {
+        "NewButler":            {"value": 7000, "type": "coins"},
+        "Misunderstanding":     {"value": 6750, "type": "coins"},
+        "SuddenMeeting":        {"value": 10,   "type": "barony_documents"},
+        "TavernGossip":         {"value": 6,    "type": "guild_documents"},
+        "CorruptEmployee":      {"value": 10,   "type": "guild_documents"},
+        "ReconnaissanceOfArea": {"value": 15,   "type": "guild_documents"},
+        "Rehearsal":            {"value": 20,   "type": "guild_documents"},
+        "Helen":                {"value": 25,   "type": "guild_documents"},
+    }
+)
+
+# timeline_required_items from Database.gd — informational; these timelines
+# also require owning a specific item before the game would naturally offer
+# them. Not enforced here since we write called_timelines directly, but kept
+# for reference / future "Finish Storyline" item-granting.
+TIMELINE_REQUIRED_ITEMS = {
+    "Mira":            ["GoblinSlayerHelmet"],
+    "MadmanAndVergil2": ["GoblinSlayerHelmet"],
+}
 
 
 # ============================================================
@@ -283,8 +314,15 @@ def by_story(story: str) -> list[Timeline]:
 
 
 def prerequisites(name: str) -> list[str]:
+    """
+    Returns prerequisites for any timeline name, including "ghost"
+    timelines that exist only as keys in TIMELINE_PREREQUISITES and
+    were never assigned to a story (e.g. Penance, Footjob, BingeParty).
+    """
     t = get(name)
-    return t.prerequisites.copy() if t else []
+    if t is not None:
+        return t.prerequisites.copy()
+    return list(TIMELINE_PREREQUISITES.get(name, []))
 
 
 def unlock_rooms(name: str) -> list[str]:

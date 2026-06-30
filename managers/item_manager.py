@@ -45,7 +45,7 @@ class ItemManager:
 
         data = self.model.get("shop_items_quantity", {})
 
-        if data is None:
+        if not isinstance(data, dict):
             data = {}
             self.model.set("shop_items_quantity", data)
 
